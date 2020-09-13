@@ -37,7 +37,7 @@ const pool = new Pool({
   database: process.env.database,
   user: process.env.username,
   password: process.env.password,
-  max: 20,
+  max: 50,
   // idleTimeoutMillis: 30000,
   // connectionTimeoutMillis: 2000,
 });
@@ -91,7 +91,7 @@ cron.schedule("0 0 * * *", () => {
 });
 
 
-// validate
+// validate ip address
 const validIPaddress = (ipaddress: string): boolean => {
   if (
     /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
@@ -104,6 +104,7 @@ const validIPaddress = (ipaddress: string): boolean => {
   return false;
 };
 
+// loop through all files in the directory and add valid ips into db
 const loopFiles = (fetchedFiles: string[]) => {
   console.log("Fetching from repo");
   fetchedFiles.forEach((file) => {
@@ -161,8 +162,8 @@ const insertIntoDb = (data: string[]) => {
       data.forEach(async (ips) => {
         console.log(ips)
         insertQuery.values = [ips];
-        const res = await client.query(insertQuery);
-        //   console.log(res);
+        client.query(insertQuery);
+
       });
 
       release();
