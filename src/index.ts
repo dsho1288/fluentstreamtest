@@ -174,6 +174,11 @@ const insertIntoDb = (data: string[]) => {
 
 
 const buildDb = async () => {
+  
+  const query = {
+    name: "drop-table",
+    text: "DROP TABLE IF EXISTS ipsets;",
+  };
 
   const createTable = {
     name: "create-table",
@@ -191,7 +196,7 @@ const buildDb = async () => {
         console.log(err)
         return console.error("Error acquiring client", err.stack);
       }
-
+      await client.query(query);
       await client.query(createTable);
 
       release();
