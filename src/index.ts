@@ -3,13 +3,11 @@ import shell from 'shelljs';
 import glob from 'glob';
 import fs from 'fs';
 import dotenv, { DotenvConfigOptions } from 'dotenv';
-import lineReader from 'line-reader';
 import es from 'event-stream';
 import bodyParser from 'body-parser';
 import cron from 'node-cron';
 import { Pool } from 'pg';
 
-//let fetchedFiles = []
 
 type DotConfig = DotenvConfigOptions & {
   silent: boolean;
@@ -26,12 +24,13 @@ const dotConfig: DotConfig = {
   silent: true,
 }
 
+// Load env variables which contains my db connection
 dotenv.config(dotConfig);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
+// create connection pool
 const pool = new Pool({
   host: process.env.host,
   port: parseInt(<string>process.env.db_port, 10),
@@ -46,7 +45,7 @@ const pool = new Pool({
 app.get("/", (req, res) => {
   res.send("Welcome To Davids Fluentstream Ip Search!");
 });
-
+// api to search for flagged ips in my database
 app.post("/ip", (req, res) => {
   const { ip } = req.body;
 
@@ -64,7 +63,7 @@ app.post("/ip", (req, res) => {
       }
       
       const { rows } = await client.query(query);
-    
+      // if ip is present return true
       res.json({ data: rows.length > 0 ? true: false });
 
       release();
@@ -79,16 +78,20 @@ app.listen(port, () => {
 });
 
 
-
+// shell script to pull the iplist repo
 setTimeout(() => shell.exec("./pull-repo.sh"), 1000 )
 
+// cron job to update repo with ip, automated part
 cron.schedule("0 0 * * *", () => {
+    // pull most recent git repo
     shell.exec("./pull.sh");
+  
+    // ingest data into db
     importData()
 });
 
 
-
+// validate
 const validIPaddress = (ipaddress: string): boolean => {
   if (
     /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
