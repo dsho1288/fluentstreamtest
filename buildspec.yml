@@ -1,0 +1,19 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - "echo Build started on `date`"
+      - "echo Building the Docker image..."
+      - docker build -t fluentstream .
+      - docker tag fluentstream:latest 895334981351.dkr.ecr.us-east-2.amazonaws.com/fluentstream:latest
+  post_build:
+    commands:
+      - "echo Build completed on `date`"
+      - "echo Pushing the Docker image..."
+      - "docker push 895334981351.dkr.ecr.us-east-2.amazonaws.com/fluentstream:latest"
+  pre_build:
+    commands:
+      - "echo Logging in to Docker Hub..."
+      - "aws ecr get-login-password --region us-east-2 |  docker login --username AWS --password-stdin 895334981351.dkr.ecr.us-east-2.amazonaws.com "
+artifacts:
+  files: imagedefinitions.json
