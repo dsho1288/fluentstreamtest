@@ -165,7 +165,7 @@ const insertIntoDb = (data: string[]) => {
         //   console.log(res);
       });
 
-      // release();
+      release();
     });
   } catch (err) {
     console.log(err)
@@ -194,7 +194,7 @@ const buildDb = async () => {
 
       await client.query(createTable);
 
-      // release();
+      release();
     });
   } catch (err) {}
 };
