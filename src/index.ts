@@ -44,7 +44,7 @@ const pool = new Pool({
 });
 
 app.get("/", (req, res) => {
-  res.send("Welcome To Ip Search!");
+  res.send("Welcome To Davids Fluentstream Ip Search!");
 });
 
 app.post("/ip", (req, res) => {
@@ -62,14 +62,16 @@ app.post("/ip", (req, res) => {
       if (err) {
         return console.error("Error acquiring client", err.stack);
       }
-
+      
       const { rows } = await client.query(query);
     
       res.json({ data: rows.length > 0 ? true: false });
 
-      // release();
+      release();
     });
-  } catch (err) {}
+  } catch (err) {
+    console.log(err)
+  }
 });
 
 app.listen(port, () => {
