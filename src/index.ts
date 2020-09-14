@@ -37,9 +37,9 @@ const pool = new Pool({
   database: process.env.database,
   user: process.env.username,
   password: process.env.password,
-  max: 100,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 20,
+  // idleTimeoutMillis: 30000,
+  // connectionTimeoutMillis: 2000,
 });
 
 app.get("/", (req, res) => {
