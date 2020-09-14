@@ -37,9 +37,9 @@ const pool = new Pool({
   database: process.env.database,
   user: process.env.username,
   password: process.env.password,
-  max: 50,
-  // idleTimeoutMillis: 30000,
-  // connectionTimeoutMillis: 2000,
+  max: 100,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 app.get("/", (req, res) => {
@@ -121,8 +121,7 @@ const loopFiles = (fetchedFiles: string[]) => {
             // pause the readstream
     
             if (validIPaddress(line)) {
-                // validIps.push(line)
-              insertIntoDbPlus(line)
+                validIps.push(line)
             }
             s.pause();
 
@@ -143,7 +142,7 @@ const loopFiles = (fetchedFiles: string[]) => {
           })
       );
       
-      // insertIntoDb(validIps);
+      insertIntoDb(validIps);
   });
 };
 
@@ -207,36 +206,21 @@ const buildDb = async () => {
 };
 
 buildDb()
-const insertIntoDbPlus = (data: any) => {
-  try {
-    const insertQuery = {
-      name: "insert-table",
-      text: "INSERT INTO ipsets (ipset) VALUES ($1);",
-      values: [data]
-    };
-
-    pool.connect(async (err, client, release) => {
-      if (err) {
-        return console.error("Error acquiring client", err.stack);
-      }
-
-      const res = await client.query(insertQuery);
-
-      release();
-    });
-  } catch (err) { }
-};
-
-
 
 const importData = () => {
+  try {
     glob("./blocklist-ipsets/**/*.ipset", async (err, files) => {
+
       loopFiles(files);
     });
 
     glob("./blocklist-ipsets/**/*.netset", async (err, files) => {
       loopFiles(files);
     });
+  } catch (error) {
+    console.log('import data error', error)
+  }
+    
     
 }
 

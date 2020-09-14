@@ -64,7 +64,9 @@ var pool = new pg_1.Pool({
     database: process.env.database,
     user: process.env.username,
     password: process.env.password,
-    max: 50,
+    max: 100,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
 });
 app.get("/", function (req, res) {
     res.send("Welcome To Davids Fluentstream Ip Search!");
@@ -134,8 +136,7 @@ var loopFiles = function (fetchedFiles) {
             .mapSync(function (line) {
             // pause the readstream
             if (validIPaddress(line)) {
-                // validIps.push(line)
-                insertIntoDbPlus(line);
+                validIps.push(line);
             }
             s.pause();
             lineNr += 1;
@@ -150,7 +151,7 @@ var loopFiles = function (fetchedFiles) {
             .on("end", function () {
             console.log("Read entire file.");
         }));
-        // insertIntoDb(validIps);
+        insertIntoDb(validIps);
     });
 };
 var insertIntoDb = function (data) {
@@ -168,7 +169,10 @@ var insertIntoDb = function (data) {
                     return __generator(this, function (_a) {
                         console.log(ips);
                         insertQuery_1.values = [ips];
-                        client.query(insertQuery_1);
+                        client.query(insertQuery_1)
+                            .then(function (res) { return console.log(res); })
+                            .catch(function (err) { return console.log(err); });
+                        ;
                         return [2 /*return*/];
                     });
                 }); });
@@ -195,21 +199,19 @@ var buildDb = function () { return __awaiter(void 0, void 0, void 0, function ()
         try {
             pool.connect(function (err, client, release) { return __awaiter(void 0, void 0, void 0, function () {
                 return __generator(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            if (err) {
-                                console.log(err);
-                                return [2 /*return*/, console.error("Error acquiring client", err.stack)];
-                            }
-                            return [4 /*yield*/, client.query(query)];
-                        case 1:
-                            _a.sent();
-                            return [4 /*yield*/, client.query(createTable)];
-                        case 2:
-                            _a.sent();
-                            release();
-                            return [2 /*return*/];
+                    if (err) {
+                        console.log(err);
+                        return [2 /*return*/, console.error("Error acquiring client", err.stack)];
                     }
+                    client.query(query)
+                        .then(function (res) { return console.log(res); })
+                        .catch(function (err) { return console.log(err); });
+                    client.query(createTable)
+                        .then(function (res) { return console.log(res); })
+                        .catch(function (err) { return console.log(err); });
+                    ;
+                    release();
+                    return [2 /*return*/];
                 });
             }); });
         }
@@ -218,44 +220,23 @@ var buildDb = function () { return __awaiter(void 0, void 0, void 0, function ()
     });
 }); };
 buildDb();
-var insertIntoDbPlus = function (data) {
+var importData = function () {
     try {
-        var insertQuery_2 = {
-            name: "insert-table",
-            text: "INSERT INTO ipsets (ipset) VALUES ($1);",
-            values: [data]
-        };
-        pool.connect(function (err, client, release) { return __awaiter(void 0, void 0, void 0, function () {
-            var res;
+        glob_1.default("./blocklist-ipsets/**/*.ipset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (err) {
-                            return [2 /*return*/, console.error("Error acquiring client", err.stack)];
-                        }
-                        return [4 /*yield*/, client.query(insertQuery_2)];
-                    case 1:
-                        res = _a.sent();
-                        release();
-                        return [2 /*return*/];
-                }
+                loopFiles(files);
+                return [2 /*return*/];
+            });
+        }); });
+        glob_1.default("./blocklist-ipsets/**/*.netset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                loopFiles(files);
+                return [2 /*return*/];
             });
         }); });
     }
-    catch (err) { }
-};
-var importData = function () {
-    glob_1.default("./blocklist-ipsets/**/*.ipset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            loopFiles(files);
-            return [2 /*return*/];
-        });
-    }); });
-    glob_1.default("./blocklist-ipsets/**/*.netset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            loopFiles(files);
-            return [2 /*return*/];
-        });
-    }); });
+    catch (error) {
+        console.log('import data error', error);
+    }
 };
 setTimeout(function () { return importData(); }, 5000);
