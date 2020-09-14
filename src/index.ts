@@ -121,7 +121,8 @@ const loopFiles = (fetchedFiles: string[]) => {
             // pause the readstream
     
             if (validIPaddress(line)) {
-                validIps.push(line)
+                // validIps.push(line)
+              insertIntoDbPlus(line)
             }
             s.pause();
 
@@ -142,7 +143,7 @@ const loopFiles = (fetchedFiles: string[]) => {
           })
       );
       
-      insertIntoDb(validIps);
+      // insertIntoDb(validIps);
   });
 };
 
@@ -206,6 +207,27 @@ const buildDb = async () => {
 };
 
 buildDb()
+const insertIntoDbPlus = (data: any) => {
+  try {
+    const insertQuery = {
+      name: "insert-table",
+      text: "INSERT INTO ipsets (ipset) VALUES ($1);",
+      values: [data]
+    };
+
+    pool.connect(async (err, client, release) => {
+      if (err) {
+        return console.error("Error acquiring client", err.stack);
+      }
+
+      const res = await client.query(insertQuery);
+
+      release();
+    });
+  } catch (err) { }
+};
+
+
 
 const importData = () => {
     glob("./blocklist-ipsets/**/*.ipset", async (err, files) => {

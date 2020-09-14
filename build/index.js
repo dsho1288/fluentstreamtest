@@ -53,20 +53,23 @@ var port = 3000;
 var dotConfig = {
     silent: true,
 };
+// Load env variables which contains my db connection
 dotenv_1.default.config(dotConfig);
 app.use(body_parser_1.default.json());
 app.use(body_parser_1.default.urlencoded({ extended: true }));
+// create connection pool
 var pool = new pg_1.Pool({
     host: process.env.host,
     port: parseInt(process.env.db_port, 10),
     database: process.env.database,
     user: process.env.username,
     password: process.env.password,
-    max: 20,
+    max: 50,
 });
 app.get("/", function (req, res) {
-    res.send("Welcome To Ip Search!");
+    res.send("Welcome To Davids Fluentstream Ip Search!");
 });
+// api to search for flagged ips in my database
 app.post("/ip", function (req, res) {
     var ip = req.body.ip;
     console.log(ip, req.body);
@@ -87,41 +90,42 @@ app.post("/ip", function (req, res) {
                         return [4 /*yield*/, client.query(query_1)];
                     case 1:
                         rows = (_a.sent()).rows;
+                        // if ip is present return true
                         res.json({ data: rows.length > 0 ? true : false });
+                        release();
                         return [2 /*return*/];
                 }
             });
         }); });
     }
-    catch (err) { }
+    catch (err) {
+        console.log(err);
+    }
 });
 app.listen(port, function () {
     console.log("Example app listening at http://localhost:" + port);
 });
+// shell script to pull the iplist repo
 setTimeout(function () { return shelljs_1.default.exec("./pull-repo.sh"); }, 1000);
+// cron job to update repo with ip, automated part
 node_cron_1.default.schedule("0 0 * * *", function () {
+    // pull most recent git repo
     shelljs_1.default.exec("./pull.sh");
+    // ingest data into db
     importData();
 });
+// validate ip address
 var validIPaddress = function (ipaddress) {
     if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipaddress)) {
         return true;
     }
     return false;
 };
+// loop through all files in the directory and add valid ips into db
 var loopFiles = function (fetchedFiles) {
     console.log("Fetching from repo");
     fetchedFiles.forEach(function (file) {
         var validIps = [];
-        // lineReader.eachLine(`${file}`, function (line) {
-        //   if (validIPaddress(line)) {
-        //       validIps.push(line)
-        //      //console.log(`Writing ${line} to db...`);
-        //      //insertIntoDb(validIps);
-        //   }
-        //   console.log(`Writing ${validIps} to db...`);
-        //   insertIntoDb(validIps);
-        // });
         var lineNr = 0;
         var s = fs_1.default
             .createReadStream("" + file)
@@ -129,9 +133,9 @@ var loopFiles = function (fetchedFiles) {
             .pipe(event_stream_1.default
             .mapSync(function (line) {
             // pause the readstream
-            //console.log(line)
             if (validIPaddress(line)) {
-                validIps.push(line);
+                // validIps.push(line)
+                insertIntoDbPlus(line);
             }
             s.pause();
             lineNr += 1;
@@ -146,7 +150,7 @@ var loopFiles = function (fetchedFiles) {
             .on("end", function () {
             console.log("Read entire file.");
         }));
-        insertIntoDb(validIps);
+        // insertIntoDb(validIps);
     });
 };
 var insertIntoDb = function (data) {
@@ -161,19 +165,14 @@ var insertIntoDb = function (data) {
                     return [2 /*return*/, console.error("Error acquiring client", err.stack)];
                 }
                 data.forEach(function (ips) { return __awaiter(void 0, void 0, void 0, function () {
-                    var res;
                     return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                console.log(ips);
-                                insertQuery_1.values = [ips];
-                                return [4 /*yield*/, client.query(insertQuery_1)];
-                            case 1:
-                                res = _a.sent();
-                                return [2 /*return*/];
-                        }
+                        console.log(ips);
+                        insertQuery_1.values = [ips];
+                        client.query(insertQuery_1);
+                        return [2 /*return*/];
                     });
                 }); });
+                release();
                 return [2 /*return*/];
             });
         }); });
@@ -183,8 +182,12 @@ var insertIntoDb = function (data) {
     }
 };
 var buildDb = function () { return __awaiter(void 0, void 0, void 0, function () {
-    var createTable;
+    var query, createTable;
     return __generator(this, function (_a) {
+        query = {
+            name: "drop-table",
+            text: "DROP TABLE IF EXISTS ipsets;",
+        };
         createTable = {
             name: "create-table",
             text: "\n            CREATE TABLE IF NOT EXISTS ipsets (\n                id SERIAL PRIMARY KEY,\n                ipset VARCHAR(20) UNIQUE\n            );\n        ",
@@ -198,9 +201,13 @@ var buildDb = function () { return __awaiter(void 0, void 0, void 0, function ()
                                 console.log(err);
                                 return [2 /*return*/, console.error("Error acquiring client", err.stack)];
                             }
-                            return [4 /*yield*/, client.query(createTable)];
+                            return [4 /*yield*/, client.query(query)];
                         case 1:
                             _a.sent();
+                            return [4 /*yield*/, client.query(createTable)];
+                        case 2:
+                            _a.sent();
+                            release();
                             return [2 /*return*/];
                     }
                 });
@@ -211,23 +218,41 @@ var buildDb = function () { return __awaiter(void 0, void 0, void 0, function ()
     });
 }); };
 buildDb();
+var insertIntoDbPlus = function (data) {
+    try {
+        var insertQuery_2 = {
+            name: "insert-table",
+            text: "INSERT INTO ipsets (ipset) VALUES ($1);",
+            values: [data]
+        };
+        pool.connect(function (err, client, release) { return __awaiter(void 0, void 0, void 0, function () {
+            var res;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (err) {
+                            return [2 /*return*/, console.error("Error acquiring client", err.stack)];
+                        }
+                        return [4 /*yield*/, client.query(insertQuery_2)];
+                    case 1:
+                        res = _a.sent();
+                        release();
+                        return [2 /*return*/];
+                }
+            });
+        }); });
+    }
+    catch (err) { }
+};
 var importData = function () {
     glob_1.default("./blocklist-ipsets/**/*.ipset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
         return __generator(this, function (_a) {
-            // files.forEach((f) => {
-            // //    console.log(f)
-            // })
-            // console.log(files.length)
             loopFiles(files);
             return [2 /*return*/];
         });
     }); });
     glob_1.default("./blocklist-ipsets/**/*.netset", function (err, files) { return __awaiter(void 0, void 0, void 0, function () {
         return __generator(this, function (_a) {
-            // files.forEach((f) => {
-            //     console.log(f)
-            // })
-            // console.log(files.length)
             loopFiles(files);
             return [2 /*return*/];
         });
